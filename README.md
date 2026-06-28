@@ -12,8 +12,9 @@
 
 OmniPlayer 是一个面向 Windows 的一键集成、配置与启动程序。它把 **Omniphony Studio**、**mpv-omniphony**、`orender` 和兼容 bridge 的路径发现、配置管理、OSC 监看及音频设备选择集中到一个可视化界面中。
 
-OmniPlayer **不是新的 Dolby 解码器，也不自行实现、修改或逆向任何专有编解码算法**。媒体解析、空间渲染及 bridge 能力均来自各自独立开发、独立授权的上游开源组件；OmniPlayer 的职责只是安装编排、配置保护和进程启动。项目与 Dolby Laboratories、Audinate 及相关商标权利人不存在隶属、背书或合作关系。
+<img width="1098" height="783" alt="屏幕截图 2026-06-28 180116" src="https://github.com/user-attachments/assets/6eba53e6-d8e9-47bc-bb22-54eafd5532f1" />
 
+OmniPlayer **不是新的 Dolby 解码器，也不自行实现、修改或逆向任何专有编解码算法**。媒体解析、空间渲染及 bridge 能力均来自各自独立开发、独立授权的上游开源组件；OmniPlayer 的职责只是安装编排、配置保护和进程启动。项目与 Dolby Laboratories、Audinate 及相关商标权利人不存在隶属、背书或合作关系。
 ## Features
 
 - Unified black-and-purple Windows UI
