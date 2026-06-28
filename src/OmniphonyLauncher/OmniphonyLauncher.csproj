@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>OmniPlayer</AssemblyName>
     <RootNamespace>OmniphonyLauncher</RootNamespace>
-    <Version>1.3.0</Version>
+    <Version>1.4.0</Version>
     <Product>OmniPlayer</Product>
     <AssemblyTitle>OmniPlayer</AssemblyTitle>
     <ApplicationIcon>assets\omniplayer.ico</ApplicationIcon>

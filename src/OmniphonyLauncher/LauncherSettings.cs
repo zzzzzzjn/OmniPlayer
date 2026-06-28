@@ -16,6 +16,7 @@ public sealed class LauncherSettings
     public string AudioDevice { get; set; } = "auto";
     public int OscPort { get; set; } = 9000;
     public string ExtraArguments { get; set; } = "";
+    public string Language { get; set; } = "zh-CN";
 
     private static readonly string FilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OmniphonyLauncher", "settings.json");
 

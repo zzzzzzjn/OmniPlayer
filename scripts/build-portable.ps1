@@ -17,7 +17,7 @@ if (!(Test-Path -LiteralPath (Join-Path $MpvSource "mpv.exe"))) { throw "mpv run
 if (!(Test-Path -LiteralPath (Join-Path $StudioSource "omniphony-studio.exe"))) { throw "Studio runtime not found: $StudioSource" }
 if ((Test-Path -LiteralPath $package) -or (Test-Path -LiteralPath $zip)) { throw "Output already exists; choose a new version or remove the generated output: $package" }
 
-& $dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=false -o $publish
+& $dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o $publish
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
 New-Item -ItemType Directory -Path $package | Out-Null
@@ -25,7 +25,7 @@ New-Item -ItemType Directory -Path (Join-Path $package "runtime\mpv") | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $package "runtime\studio") | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $package "legal") | Out-Null
 
-Copy-Item -LiteralPath (Join-Path $publish "OmniPlayer.exe") -Destination (Join-Path $package "OmniPlayer.exe")
+Get-ChildItem -LiteralPath $publish -File | Copy-Item -Destination $package
 Get-ChildItem -LiteralPath $MpvSource -File | Where-Object { $_.Name -notlike "mpv-shot*" } | Copy-Item -Destination (Join-Path $package "runtime\mpv")
 Copy-Item -LiteralPath (Join-Path $StudioSource "omniphony-studio.exe") -Destination (Join-Path $package "runtime\studio\omniphony-studio.exe")
 Copy-Item -LiteralPath (Join-Path $StudioSource "orender.exe") -Destination (Join-Path $package "runtime\studio\orender.exe")
@@ -33,7 +33,9 @@ Copy-Item -LiteralPath (Join-Path $StudioSource "harletty_bridge.dll") -Destinat
 if (Test-Path -LiteralPath (Join-Path $StudioSource "_up_")) { Copy-Item -LiteralPath (Join-Path $StudioSource "_up_") -Destination (Join-Path $package "runtime\studio\_up_") -Recurse }
 
 Copy-Item -Path (Join-Path $root "legal\*") -Destination (Join-Path $package "legal")
-Copy-Item -LiteralPath (Join-Path $root "docs\便携版使用说明.md") -Destination (Join-Path $package "使用说明.md")
+$guide = Get-ChildItem -LiteralPath (Join-Path $root "docs") -Filter "*.md" | Select-Object -First 1
+if ($null -eq $guide) { throw "Portable guide not found in docs directory" }
+Copy-Item -LiteralPath $guide.FullName -Destination (Join-Path $package "README-zh-CN.md")
 
 Compress-Archive -LiteralPath $package -DestinationPath $zip -CompressionLevel Optimal
 Write-Output "Portable package: $package"

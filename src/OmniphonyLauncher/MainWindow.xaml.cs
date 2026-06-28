@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Input;
 
 namespace OmniphonyLauncher;
 
@@ -13,10 +14,32 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        App.SetLanguage(_settings.Language);
         InitializeComponent();
         PathDiscovery.FillMissing(_settings);
         ToUi();
         Loaded += async (_, _) => { await RefreshAudioDevicesAsync(); await DiagnoseAsync(false); };
+    }
+
+    private string T(string key) => Application.Current.TryFindResource(key)?.ToString() ?? key;
+    private bool IsEnglish => _settings.Language.StartsWith("en", StringComparison.OrdinalIgnoreCase);
+    private string L(string chinese, string english) => IsEnglish ? english : chinese;
+
+    private async void Language_Click(object sender, RoutedEventArgs e)
+    {
+        FromUi();
+        _settings.Language = _settings.Language.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "zh-CN" : "en-US";
+        _settings.Save();
+        App.SetLanguage(_settings.Language);
+        await RefreshAudioDevicesAsync();
+        await DiagnoseAsync(false);
+    }
+
+    private void About_Click(object sender, RoutedEventArgs e)
+    {
+        var previousFocus = Keyboard.FocusedElement;
+        new AboutWindow { Owner = this }.ShowDialog();
+        previousFocus?.Focus();
     }
 
     private void ToUi()
@@ -46,7 +69,7 @@ public partial class MainWindow : Window
 
     private void PickMedia_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog { Filter = "媒体文件|*.mkv;*.mka;*.mlp;*.thd;*.mp4;*.webm;*.mov|所有文件|*.*" };
+        var dialog = new OpenFileDialog { Filter = T("MediaFilter") };
         if (dialog.ShowDialog() == true) MediaPathBox.Text = dialog.FileName;
     }
 
@@ -54,13 +77,14 @@ public partial class MainWindow : Window
     {
         var button = (FrameworkElement)sender; var tag = button.Tag?.ToString();
         var isConfig = tag == "config"; var isBridge = tag == "bridge";
-        var dialog = new OpenFileDialog { Filter = isConfig ? "YAML|*.yaml;*.yml|所有文件|*.*" : isBridge ? "DLL|*.dll|所有文件|*.*" : "程序|*.exe|所有文件|*.*" };
+        var allFiles = T("AllFiles");
+        var dialog = new OpenFileDialog { Filter = isConfig ? $"YAML|*.yaml;*.yml|{allFiles}" : isBridge ? $"DLL|*.dll|{allFiles}" : $"Executable|*.exe|{allFiles}" };
         if (dialog.ShowDialog() != true) return;
         if (tag == "mpv") MpvPathBox.Text = dialog.FileName; else if (tag == "studio") StudioPathBox.Text = dialog.FileName;
         else if (tag == "orender") OrenderPathBox.Text = dialog.FileName; else if (tag == "bridge") BridgePathBox.Text = dialog.FileName; else ConfigPathBox.Text = dialog.FileName;
     }
 
-    private void AutoDiscover_Click(object sender, RoutedEventArgs e) { FromUi(); PathDiscovery.FillMissing(_settings); ToUi(); Log("已完成路径自动发现"); }
+    private void AutoDiscover_Click(object sender, RoutedEventArgs e) { FromUi(); PathDiscovery.FillMissing(_settings); ToUi(); Log(L("已完成路径自动发现", "Component paths discovered")); }
 
     private void SaveConfig_Click(object sender, RoutedEventArgs e)
     {
@@ -72,7 +96,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            Save(); RequireFile(_settings.MpvPath, "mpv-omniphony"); RequireFile(_settings.BridgePath, "bridge DLL"); RequireFile(_settings.MediaPath, "片源");
+            Save(); RequireFile(_settings.MpvPath, "mpv-omniphony"); RequireFile(_settings.BridgePath, "bridge DLL"); RequireFile(_settings.MediaPath, L("片源", "media file"));
             ConfigEditor.ApplyBridgePath(_settings.ConfigPath, _settings.BridgePath);
             if (_settings.StartStudio && File.Exists(_settings.StudioPath) && !Process.GetProcessesByName("omniphony-studio").Any()) ProcessRunner.Start(_settings.StudioPath, []);
             var args = new List<string> { "--ad=orender", $"--ad-orender-config={_settings.ConfigPath}", $"--ad-orender-bridge-path={_settings.BridgePath}" };
@@ -80,12 +104,12 @@ public partial class MainWindow : Window
             if (!_settings.ShowMpvOverlay) args.Add($"--script={EnsureOverlayDisableScript()}");
             if (!string.IsNullOrWhiteSpace(_settings.AudioDevice) && _settings.AudioDevice != "auto") args.Add($"--audio-device={_settings.AudioDevice}");
             args.AddRange(SplitArguments(_settings.ExtraArguments)); args.Add(_settings.MediaPath);
-            ProcessRunner.Start(_settings.MpvPath, args); Log("已启动 mpv：" + string.Join(" ", args.Select(QuoteForLog)));
+            ProcessRunner.Start(_settings.MpvPath, args); Log(L("已启动 mpv：", "Started mpv: ") + string.Join(" ", args.Select(QuoteForLog)));
         }
         catch (Exception ex) { Fail(ex); }
     }
 
-    private void LaunchStudio_Click(object sender, RoutedEventArgs e) { try { Save(); RequireFile(_settings.StudioPath, "Studio"); ProcessRunner.Start(_settings.StudioPath, []); Log("已启动 Studio"); } catch (Exception ex) { Fail(ex); } }
+    private void LaunchStudio_Click(object sender, RoutedEventArgs e) { try { Save(); RequireFile(_settings.StudioPath, "Studio"); ProcessRunner.Start(_settings.StudioPath, []); Log(L("已启动 Studio", "Started Studio")); } catch (Exception ex) { Fail(ex); } }
 
     private void OpenConfigFolder_Click(object sender, RoutedEventArgs e)
     {
@@ -100,7 +124,7 @@ public partial class MainWindow : Window
     {
         FromUi();
         var selected = _settings.AudioDevice;
-        var devices = new List<AudioDeviceItem> { new("auto", "系统自动选择") };
+        var devices = new List<AudioDeviceItem> { new("auto", T("AutoDevice")) };
         if (File.Exists(_settings.MpvPath))
         {
             var output = await ProcessRunner.ProbeAsync(_settings.MpvPath, new[] { "--no-config", "--audio-device=help", "--idle=no" }, 7000);
@@ -113,23 +137,25 @@ public partial class MainWindow : Window
         }
         AudioDeviceBox.ItemsSource = devices;
         AudioDeviceBox.SelectedValue = devices.Any(x => x.Id == selected) ? selected : "auto";
-        if (writeLog) Log($"已枚举 {devices.Count - 1} 个音频输出；Dante ASIO {(devices.Any(x => x.Id.StartsWith("asio/Dante", StringComparison.OrdinalIgnoreCase)) ? "可用" : "未发现")}");
+        if (writeLog) Log(IsEnglish
+            ? $"Found {devices.Count - 1} audio outputs; Dante ASIO {(devices.Any(x => x.Id.StartsWith("asio/Dante", StringComparison.OrdinalIgnoreCase)) ? "available" : "not found")}"
+            : $"已枚举 {devices.Count - 1} 个音频输出；Dante ASIO {(devices.Any(x => x.Id.StartsWith("asio/Dante", StringComparison.OrdinalIgnoreCase)) ? "可用" : "未发现")}");
     }
     private async Task DiagnoseAsync(bool verbose)
     {
         Save(); var checks = new[] { ("mpv-omniphony", _settings.MpvPath), ("Studio", _settings.StudioPath), ("orender CLI", _settings.OrenderPath), ("bridge DLL", _settings.BridgePath), ("config.yaml", _settings.ConfigPath) };
         var requiredOk = File.Exists(_settings.MpvPath) && File.Exists(_settings.BridgePath) && File.Exists(_settings.ConfigPath);
-        if (verbose) foreach (var (name, path) in checks) Log($"{(File.Exists(path) ? "OK" : "缺失"),-4} {name}: {path}");
+        if (verbose) foreach (var (name, path) in checks) Log($"{(File.Exists(path) ? "OK" : L("缺失", "MISS")),-4} {name}: {path}");
         if (verbose && File.Exists(_settings.MpvPath))
         {
             var version = await ProcessRunner.ProbeAsync(_settings.MpvPath, "--version");
-            Log("mpv 版本: " + version.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim());
+            Log(L("mpv 版本: ", "mpv version: ") + version.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim());
             var options = await ProcessRunner.ProbeAsync(_settings.MpvPath, "--list-options", 7000);
-            Log(options.Contains("ad-orender-bridge-path", StringComparison.OrdinalIgnoreCase) ? "OK   检测到 ad_orender 参数" : "失败 当前 mpv 似乎不是 mpv-omniphony 构建");
-            Log(AudioDeviceBox.Items.OfType<AudioDeviceItem>().Any(x => x.Id.StartsWith("asio/Dante", StringComparison.OrdinalIgnoreCase)) ? "OK   检测到 Dante Virtual Soundcard ASIO 输出" : "提示 未检测到 Dante ASIO 输出，请先启动并配置 DVS");
+            Log(options.Contains("ad-orender-bridge-path", StringComparison.OrdinalIgnoreCase) ? L("OK   检测到 ad_orender 参数", "OK   ad_orender option detected") : L("失败 当前 mpv 似乎不是 mpv-omniphony 构建", "FAIL Current mpv does not appear to be an mpv-omniphony build"));
+            Log(AudioDeviceBox.Items.OfType<AudioDeviceItem>().Any(x => x.Id.StartsWith("asio/Dante", StringComparison.OrdinalIgnoreCase)) ? L("OK   检测到 Dante Virtual Soundcard ASIO 输出", "OK   Dante Virtual Soundcard ASIO output detected") : L("提示 未检测到 Dante ASIO 输出，请先启动并配置 DVS", "NOTE Dante ASIO output was not detected; start and configure DVS first"));
         }
-        OverallStatus.Text = requiredOk ? "● 核心组件就绪" : "● 需要修复路径";
-        OverallStatus.Foreground = requiredOk ? (System.Windows.Media.Brush)FindResource("Accent") : System.Windows.Media.Brushes.Orange;
+        OverallStatus.Text = requiredOk ? T("StatusReady") : T("StatusNeedsAttention");
+        OverallStatus.Foreground = requiredOk ? (System.Windows.Media.Brush)FindResource("TextPrimary") : System.Windows.Media.Brushes.Orange;
     }
 
     private void Window_Drop(object sender, DragEventArgs e)
@@ -138,8 +164,8 @@ public partial class MainWindow : Window
     }
 
     private void ClearLog_Click(object sender, RoutedEventArgs e) => LogBox.Clear();
-    private void Fail(Exception ex) { Log("错误: " + ex.Message); MessageBox.Show(ex.Message, "启动失败", MessageBoxButton.OK, MessageBoxImage.Error); }
-    private static void RequireFile(string path, string label) { if (!File.Exists(path)) throw new FileNotFoundException($"找不到{label}：{path}"); }
+    private void Fail(Exception ex) { Log(L("错误: ", "Error: ") + ex.Message); MessageBox.Show(ex.Message, L("启动失败", "Launch failed"), MessageBoxButton.OK, MessageBoxImage.Error); }
+    private void RequireFile(string path, string label) { if (!File.Exists(path)) throw new FileNotFoundException(IsEnglish ? $"Cannot find {label}: {path}" : $"找不到{label}：{path}"); }
     private static string QuoteForLog(string arg) => arg.Contains(' ') ? $"\"{arg}\"" : arg;
 
     private static string EnsureOverlayDisableScript()
@@ -152,7 +178,7 @@ public partial class MainWindow : Window
         return path;
     }
 
-    private static IEnumerable<string> SplitArguments(string commandLine)
+    private IEnumerable<string> SplitArguments(string commandLine)
     {
         if (string.IsNullOrWhiteSpace(commandLine)) yield break;
         var current = new StringBuilder(); var quoted = false;
@@ -163,7 +189,7 @@ public partial class MainWindow : Window
             if (char.IsWhiteSpace(c) && !quoted) { if (current.Length > 0) { yield return current.ToString(); current.Clear(); } }
             else current.Append(c);
         }
-        if (quoted) throw new FormatException("附加参数中有未闭合的双引号");
+        if (quoted) throw new FormatException(L("附加参数中有未闭合的双引号", "Additional arguments contain an unclosed quotation mark"));
         if (current.Length > 0) yield return current.ToString();
     }
 }
