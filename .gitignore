@@ -1,0 +1,29 @@
+# Build and local runtime state
+**/bin/
+**/obj/
+.vs/
+work/
+outputs/
+
+# User-specific launcher/config state
+*.user
+*.suo
+settings.json
+config.yaml
+config.yaml.launcher-backup-*
+
+# Media, captures and packages
+*.mkv
+*.mka
+*.mlp
+*.thd
+*.mp4
+*.mov
+*.webm
+*.zip
+mpv-shot*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
